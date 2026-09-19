@@ -105,3 +105,9 @@ button:focus-visible { outline: 3px solid #263e65; outline-offset: 5px; }
   .auth-content { margin-top: 30px; }
   .auth-footer { padding-top: 24px; }
 }
+
+.callback-card { width: min(420px, calc(100vw - 32px)); padding: 32px; border-radius: 20px; background: white; box-shadow: 0 16px 40px #26334212; }
+.callback-card h1 { font-size: 26px; margin-top: 24px; }
+.callback-card p { color: #535b63; line-height: 1.6; }
+.callback-card a { margin-top: 24px; text-decoration: none; }
+.callback-card a:focus-visible { outline: 3px solid #263e65; outline-offset: 5px; }

@@ -2,15 +2,19 @@
 import { AuthProvider } from './auth/AuthProvider'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
+import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { RequestsPage } from './pages/RequestsPage'
 
 function App() {
-  return <AuthProvider><BrowserRouter><Routes>
+  return <BrowserRouter><AuthProvider><Routes>
     <Route path="/login" element={<LoginPage />} />
+    <Route path="/auth/callback" element={<AuthCallbackPage />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/requests" element={<RequestsPage />} />
+      <Route path="/requests/new" element={<RequestsPage />} />
+      <Route path="/requests/:requestId" element={<RequestsPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/requests" replace />} />
-  </Routes></BrowserRouter></AuthProvider>
+  </Routes></AuthProvider></BrowserRouter>
 }
 export default App

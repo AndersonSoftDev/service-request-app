@@ -1,6 +1,6 @@
 ﻿# Customer Service Request Portal
 
-React, TypeScript, and Vite SPA. The interface is in English.
+React + TypeScript + Vite. The interface is in English.
 
 ## Development
 
@@ -9,39 +9,69 @@ npm install
 npm run dev
 ~~~
 
-- npm run build: type-check and build for production.
-- npm run lint: run ESLint.
-- npm run preview: serve the production build locally.
+Commands: npm run build, npm run lint, npm test, npm run preview.
+
+## Configure OIDC
+
+Copy .env.example to .env.local and supply your provider's public configuration:
+
+- VITE_OIDC_AUTHORITY: issuer URL, including the realm/tenant path if required.
+- VITE_OIDC_CLIENT_ID: public SPA client identifier.
+- VITE_OIDC_REDIRECT_URI: this application's origin followed by /auth/callback.
+- VITE_OIDC_POST_LOGOUT_REDIRECT_URI: this application's origin followed by /login.
+
+Restart Vite after editing environment variables. Register both redirect URLs
+exactly in your provider, enable Authorization Code with PKCE (S256), and allow
+the application origin for discovery/token requests (CORS). Use a public client,
+with no client secret. Production URLs require HTTPS; HTTP is allowed for localhost.
+The provider must publish discovery metadata and support RP-initiated logout.
+
+VITE variables are public browser configuration, never secrets. Local environment
+files are ignored by Git. No real configuration or credentials are included.
+
+## Authentication flow
+
+1. Sign in calls UserManager.signinRedirect.
+2. The SDK discovers provider endpoints and initiates Authorization Code + PKCE.
+3. The provider returns to the public /auth/callback route.
+4. AuthProvider calls completeLogin; the SDK checks protocol state and exchanges
+   the authorization code. A shared promise prevents double redemption in StrictMode.
+5. The context receives the profile and the callback redirects to /requests.
+6. Logout delegates to signoutRedirect, clears the SDK's local session, and
+   returns from the provider to /login.
+
+The SDK manages user/session and transient protocol storage in sessionStorage.
+No application code writes credentials or tokens manually. Session restoration
+runs before protected-route decisions. Expired or missing access tokens are
+treated as unauthenticated. SDK events update the context on expiry and logout.
+
+Automatic silent renewal is deliberately disabled to keep this challenge simple:
+an expired session requires another sign-in. There is no hidden iframe callback
+or refresh-token integration. Provider SSO can still simplify the next sign-in.
+
+AuthService exposes login, logout, getUser, isAuthenticated, getAccessToken,
+completeLogin, and subscribe. The React context exposes the basic profile only;
+future HTTP code can obtain a valid access token through getAccessToken.
+API authorization must still be enforced by the backend.
+
+Missing configuration leaves the login UI usable and shows a friendly message
+on sign-in. Callback failures show a generic error and a Return to login link;
+provider details and tokens are never rendered.
 
 ## Routes
 
-- /login: responsive login page.
-- /requests: protected workspace placeholder for the future service request page.
-- Other paths redirect to /requests, then /login when unauthenticated.
+Public: /login and /auth/callback.
+Protected: /requests, /requests/new, /requests/:requestId.
+The request routes intentionally share a placeholder; no Service Requests API
+or endpoints have been implemented. Authenticated visitors to /login go to /requests.
 
-Configure production hosting to serve index.html for SPA routes.
+Production hosting must serve index.html for SPA routes, including /auth/callback.
 
-## Authentication integration
+## Verification
 
-src/auth/authService.ts defines the AuthService contract: getUser, login, and logout.
-The default adapter has no configured identity provider, returns no session, and
-rejects login/logout. The login page displays a friendly unavailable message.
-It never creates fake users, stores tokens, or accepts passwords.
+npm test covers configuration, missing configuration, expired sessions, token
+access, SDK delegation, callback deduplication/failure, and session event cleanup.
+Tests use SDK mocks only; production authentication never uses fake sessions.
+Real provider sign-in/logout must be checked with your registered OIDC client.
 
-Implement this contract with an OIDC provider SDK and inject the adapter through
-AuthProvider's service prop in App.tsx. The SDK must handle authorization redirects,
-callback processing, token validation, session renewal, and logout. getUser must
-resolve only after session initialization/callback processing completes. Map the
-provider subject to AuthUser.id and optionally supply name and email. Configure
-the provider's registered callback/logout URLs when integrating it.
-
-After a successful login or restored session, /login redirects to /requests.
-AuthProvider exposes session, loading, errors, login, and logout. ProtectedRoute
-waits for session initialization before redirecting. Concurrent login/logout
-attempts are blocked. Errors shown in the UI never expose provider details.
-
-The route guard controls client navigation only. Future API integrations must
-enforce authentication on the server; no backend or API endpoints are added here.
-
-Routing uses React Router's declarative API:
-https://reactrouter.com/start/declarative/routing
+SDK reference: https://authts.github.io/oidc-client-ts/classes/UserManager.html
