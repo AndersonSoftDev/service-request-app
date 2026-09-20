@@ -140,7 +140,8 @@ export function CreateRequestPage() {
         <div className="form-field">
           <label htmlFor="priority">Priority <span className="required" aria-hidden="true">*</span></label>
           <select id="priority" name="priority" required disabled={submitting}
-            value={values.priority} onChange={(event) => change('priority', event.target.value as FormValues['priority'])}
+            value={values.priority}
+            onChange={(event) => change('priority', priorities.find((p) => p === event.target.value) ?? '')}
             aria-invalid={errors.priority ? true : undefined} aria-describedby={describedBy('priority')}>
             <option value="">Select a priority</option>
             {priorities.map((priority) => <option key={priority} value={priority}>{priorityLabels[priority]}</option>)}

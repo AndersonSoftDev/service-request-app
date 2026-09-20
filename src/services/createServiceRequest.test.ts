@@ -83,6 +83,16 @@ describe('POST /requests - successful creation', () => {
     expect(created).toMatchObject(overrides)
     expect(created.version).toBe(1)
   })
+  it('accepts an email of exactly the maximum length', async () => {
+    const requesterEmail = 'a'.repeat(242) + '@example.com'
+    expect(requesterEmail).toHaveLength(createRequestLimits.requesterEmail.max)
+    expect((await create({ ...validInput, requesterEmail })).requesterEmail).toBe(requesterEmail)
+  })
+  it('measures lengths in code points, so astral characters count once', async () => {
+    const title = '\u{1F600}'.repeat(createRequestLimits.title.max)
+    expect(title.length).toBe(createRequestLimits.title.max * 2)
+    expect((await create({ ...validInput, title })).title).toBe(title)
+  })
 })
 
 describe('POST /requests - shared store persistence', () => {
@@ -146,8 +156,12 @@ describe('POST /requests - validation', () => {
       'Requester name cannot exceed 100 characters.'],
     ['a missing email', { requesterEmail: '' }, 'requesterEmail', 'Email is required.'],
     ['an invalid email', { requesterEmail: 'not-an-email' }, 'requesterEmail', 'Please enter a valid email address.'],
-    ['an email above the maximum', { requesterEmail: 'a'.repeat(245) + '@example.com' }, 'requesterEmail',
+    ['an email one character above the maximum', { requesterEmail: 'a'.repeat(243) + '@example.com' },
+      'requesterEmail', 'Email cannot exceed 254 characters.'],
+    ['an email far above the maximum', { requesterEmail: 'a'.repeat(245) + '@example.com' }, 'requesterEmail',
       'Email cannot exceed 254 characters.'],
+    ['a title one astral character above the maximum', { title: '\u{1F600}'.repeat(121) }, 'title',
+      'Title cannot exceed 120 characters.'],
     ['a missing priority', { priority: undefined }, 'priority', 'Select a priority.'],
     ['an unknown priority', { priority: 'URGENT' }, 'priority', 'Select a priority.'],
   ]

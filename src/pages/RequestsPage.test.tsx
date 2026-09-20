@@ -184,7 +184,7 @@ describe('RequestsPage', () => {
     }))
     expect(ids()).toEqual(currentIds)
   })
-  it('delegates logout to the existing auth context and links to the existing placeholder', async () => {
+  it('links each card to its details page and delegates logout to the auth context', async () => {
     await renderPage()
     await advance()
     expect(container.querySelector('a[aria-label="View request REQ-1028"]')?.getAttribute('href')).toBe('/requests/REQ-1028')

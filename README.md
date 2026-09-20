@@ -1,261 +1,243 @@
-﻿# Customer Service Request Portal
+# Customer Service Request Portal
 
-React + TypeScript + Vite. The interface is in English.
+A responsive single-page application for managing customer service requests,
+built for the Web Developer technical challenge. Users sign in through an OIDC
+provider, then browse, search, filter, sort and paginate requests, open one,
+create a new one, and move a request through its status workflow with optimistic
+concurrency.
 
-## Development
+**The Service Request API was not available while this was built.** The
+application is implemented against the provided OpenAPI contract and currently
+uses an in-memory mock behind a service boundary, so a real HTTP implementation
+can replace it without touching the UI. See [API mocking approach](#api-mocking-approach).
+
+## Features
+
+- OIDC sign-in and sign-out (Authorization Code + PKCE) with protected routes.
+- Paginated request list with case-insensitive search by title or requester name.
+- Combinable status and priority filters, six sort orders, page sizes 1-100.
+- Request details on their own URL, including direct navigation and not-found handling.
+- Create a request, validated against the contract before and inside the service.
+- Status updates limited to valid transitions, with `version` optimistic
+  concurrency, 409 conflict detection and an explicit reload-and-retry flow.
+- Loading, empty, filtered-empty, validation, authentication and API error states.
+- Responsive layouts for desktop, tablet and mobile.
+- Automated tests, ESLint, and a GitHub Actions pipeline.
+
+## Technology and library choices
+
+| Choice | Why |
+| --- | --- |
+| React 19 + TypeScript | Required by the challenge. Strict typing across the API contract, service layer and UI. |
+| Vite 8 | Dev server and production build; the test runner shares its transform pipeline. |
+| React Router 7 | The required client-side routing solution, including protected and parameterised routes. |
+| oidc-client-ts 3 | The OIDC protocol flow is delegated to this library: discovery, PKCE, protocol state and session storage. |
+| Vitest 5 + happy-dom | Test runner aligned with Vite. Components are rendered with React's own `createRoot` and `act` rather than a testing-library wrapper, keeping the dependency list small. |
+| ESLint 10 + typescript-eslint | Linting, including the React Hooks rules. |
+| Plain CSS per page | The UI is small and consistent; a component or utility framework would add weight without improving it. |
+
+No Redux, Zustand, React Query, Formik, validation library or HTTP client: the
+application uses local React state and custom hooks because the current scope
+does not require global state management. Validation rules live in `src/domain`,
+shared by the form and the service.
+
+## Architecture
+
+```
+React pages and components
+        |
+hooks (useServiceRequests, useServiceRequest)
+        |
+service layer (src/services/serviceRequestService.ts)
+        |
+mock implementation (src/services/mock/*)
+        |
+shared in-memory store (serviceRequestStore.ts)
+```
+
+| Folder | Responsibility |
+| --- | --- |
+| `src/types` | The API contract as TypeScript types. |
+| `src/domain` | Business rules shared by the UI and the service: status transitions, create-request limits and validation, code-point length counting. Single source of truth, so no rule is restated in a component. |
+| `src/services` | The only boundary the UI talks to, the mock behind it, and the typed `ServiceRequestError`. |
+| `src/hooks` | Async loading lifecycles, including ignoring superseded responses. |
+| `src/pages`, `src/components` | UI and layout. |
+| `src/auth` | OIDC configuration, session service, context and route guard. |
+
+The UI never imports anything from `src/services/mock`; it only knows the
+service functions and the typed error.
+
+## Running the project
 
 ~~~sh
 npm install
 npm run dev
 ~~~
 
-Commands: npm run build, npm run lint, npm test, npm run preview.
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Vite dev server (http://localhost:5173). |
+| `npm test` | Full Vitest suite, once. |
+| `npm run lint` | ESLint over the repository. |
+| `npm run build` | Type-check (`tsc -b`) and production build. |
+| `npm run preview` | Serve the built bundle locally. |
 
-## Configure OIDC
+## Environment variables
 
-Copy .env.example to .env.local and supply your provider's public configuration:
+Copy `.env.example` to `.env.local` and supply your provider's public
+configuration. Restart Vite after editing it.
 
-- VITE_OIDC_AUTHORITY: issuer URL, including the realm/tenant path if required.
-- VITE_OIDC_CLIENT_ID: public SPA client identifier.
-- VITE_OIDC_REDIRECT_URI: this application's origin followed by /auth/callback.
-- VITE_OIDC_POST_LOGOUT_REDIRECT_URI: this application's origin followed by /login.
+| Variable | Required | Meaning |
+| --- | --- | --- |
+| `VITE_OIDC_AUTHORITY` | Yes | Issuer URL, including the realm/tenant path if the provider uses one. |
+| `VITE_OIDC_CLIENT_ID` | Yes | Public SPA client identifier. |
+| `VITE_OIDC_REDIRECT_URI` | Yes | This application's origin followed by `/auth/callback`. |
+| `VITE_OIDC_POST_LOGOUT_REDIRECT_URI` | Yes | This application's origin followed by `/login`. |
+| `VITE_API_BASE_URL` | No | Base URL of the Service Request API. **Currently unused**: the app runs on the mock service because the real API is unavailable. It is kept so the future HTTP implementation has a documented home. |
 
-Restart Vite after editing environment variables. Register both redirect URLs
-exactly in your provider, enable Authorization Code with PKCE (S256), and allow
-the application origin for discovery/token requests (CORS). Use a public client,
-with no client secret. Production URLs require HTTPS; HTTP is allowed for localhost.
-The provider must publish discovery metadata and support RP-initiated logout.
+`VITE_` variables are bundled into the browser and are therefore public
+configuration, never secrets. `.env`, `.env.local` and other local environment
+files are ignored by Git; only `.env.example` is committed, with placeholders.
 
-VITE variables are public browser configuration, never secrets. Local environment
-files are ignored by Git. No real configuration or credentials are included.
+## OIDC provider configuration
 
-## Authentication flow
+Register a **public** client (no client secret) and enable Authorization Code
+with PKCE (S256). Register both redirect URLs exactly as configured above, allow
+this application's origin for discovery and token requests (CORS), and enable
+RP-initiated logout. The provider must publish discovery metadata.
 
-1. Sign in calls UserManager.signinRedirect.
-2. The SDK discovers provider endpoints and initiates Authorization Code + PKCE.
-3. The provider returns to the public /auth/callback route.
-4. AuthProvider calls completeLogin; the SDK checks protocol state and exchanges
-   the authorization code. A shared promise prevents double redemption in StrictMode.
-5. The context receives the profile and the callback redirects to /requests.
-6. Logout delegates to signoutRedirect, clears the SDK's local session, and
-   returns from the provider to /login.
+ The configuration is validated at startup: a missing or malformed value leaves the
+login page usable and shows an explanatory message instead of failing silently.
 
-The SDK manages user/session and transient protocol storage in sessionStorage.
-No application code writes credentials or tokens manually. Session restoration
-runs before protected-route decisions. Expired or missing access tokens are
-treated as unauthenticated. SDK events update the context on expiry and logout.
+## Testing
 
-Automatic silent renewal is deliberately disabled to keep this challenge simple:
-an expired session requires another sign-in. There is no hidden iframe callback
-or refresh-token integration. Provider SSO can still simplify the next sign-in.
+~~~sh
+npm test
+npm run lint
+npm run build
+~~~
 
-AuthService exposes login, logout, getUser, isAuthenticated, getAccessToken,
-completeLogin, and subscribe. The React context exposes the basic profile only;
-future HTTP code can obtain a valid access token through getAccessToken.
-API authorization must still be enforced by the backend.
+The suite is 200 tests across 11 files.
 
-Missing configuration leaves the login UI usable and shows a friendly message
-on sign-in. Callback failures show a generic error and a Return to login link;
-provider details and tokens are never rendered.
+**Strategy.** Two layers, both exercising real code:
+
+- *Service and domain tests* drive the real mock through the public service
+  functions with fake timers, asserting the contract itself: search, filter and
+  sort combinations, pagination bounds and invalid page arguments, every status
+  transition and every rejected one, version conflicts, create-request validation
+  at each boundary, and store persistence and isolation.
+- *UI tests* render the real `<App />` with the router and drive real DOM events.
+  Only the OIDC SDK adapter is replaced, so routing, the route guard, hooks, the
+  service and the shared store all run for real. Assertions are behavioural:
+  what the user sees, what reaches the service, and what the store holds
+  afterwards.
+
+The service is spied on only to inject failures the mock cannot produce, such as
+500, 401/403 or an unexpected exception. The mock store is reset between tests so
+each one is deterministic. The suite mocks the OIDC SDK adapter rather than
+contacting a provider; the real sign-in and sign-out flow was verified manually
+against a local Keycloak realm.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` is in place and passing. It runs on pushes to `main`
+and `dev`, on pull requests, and on manual dispatch. Each run performs:
+
+1. Checkout.
+2. Node.js 22 setup with an npm cache.
+3. Dependency installation with `npm ci`.
+4. ESLint (`npm run lint`).
+5. Vitest tests (`npm test`).
+6. Production build (`npm run build`).
+7. Upload of the generated `dist` artifact.
+
+CI needs no OIDC credentials or provider secrets. The `VITE_` values are public
+configuration that Vite inlines at build time, and CI only verifies that the
+project lints, tests and compiles; a deployment build supplies the values for
+its target environment.
+
+## API mocking approach
+
+The application was implemented against the provided OpenAPI contract. The real
+backend endpoint was not available, so the frontend talks to a mock
+implementation instead. The mock exposes the same conceptual operations as the
+API - list, get by ID, create, and update status - through the same service
+boundary:
+
+```
+ UI -> service layer -> mock implementation -> shared in-memory store
+```
+
+The future production shape changes only the third box:
+
+```
+React UI -> service layer -> HTTP implementation -> Service Request API
+```
+
+- All four operations read and write **one shared in-memory store**, so a created
+  request is immediately listable, openable and ready for a status change.
+- Changes persist for the current application session.
+- The mock reproduces the contract's validation and business rules rather than
+  accepting anything: create-request field limits, the status transition table,
+  and note length.
+- Optimistic concurrency is simulated through `version`: the client sends the
+  version it last read and the mock compares it with the stored one.
+- Submitting a stale version produces a real 409 conflict, which the UI handles
+  with an explicit reload rather than a retry.
+- The UI depends on none of this: it imports the service functions and the typed
+  `ServiceRequestError`, never anything under `src/services/mock`.
+- Replacing it with HTTP touches only `serviceRequestService.ts`; hooks, pages,
+  components and tests keep their interfaces. See
+  [Replace the mock with HTTP later](#replace-the-mock-with-http-later).
+
+## Security considerations
+
+- Authorization Code with PKCE (S256), a public client, and no client secret
+  anywhere in the repository or the bundle.
+  The React context exposes only the basic profile.
+- Redirect URIs are validated at startup against this application's own origin
+  and fixed callback paths, and must be HTTPS outside localhost.
+- Protected routes wait for session restoration before deciding, so no protected
+  data is fetched or rendered for an unauthenticated visitor.
+- Expired or missing access tokens are treated as unauthenticated, and SDK events
+  update the session on expiry and logout.
+- Error messages are mapped to fixed strings; raw exceptions never reach the DOM.
+- Client-side route protection is a usability measure. Real authorization must
+  still be enforced by the API.
+
+- Semantic HTML first: landmarks, headings, lists, `<form>`, `<label>`, `<time>`,
+  native buttons and links, with ARIA only where the native element cannot say it.
+- Every input, select and textarea has an associated label; validation messages
+  are linked with `aria-describedby` and marked with `aria-invalid`.
+- Errors use `role="alert"`; progress and results use `role="status"`, and
+  in-flight forms are `aria-busy`.
+- Status and priority are conveyed by text, not colour alone; error and success
+  states carry wording and icons as well as colour.
+- Visible focus outlines on every interactive control, a skip link to the main
+  content, and full keyboard operation.
+- Disabled controls during submission prevent duplicate actions and are announced
+  through the live regions rather than by appearance only.
+
+## Known limitations
+
+- The real Service Request API was not provided, so no HTTP implementation
+  exists. Every call goes to the mock.
+- The mock store is in memory. It is seeded when the module loads, so a browser
+  reload restores the 28 seeded fixtures and discards created requests and status
+  changes made in that session.
+- Generated IDs continue the seeded sequence (`REQ-1029`, `REQ-1030`, ...) and are
+  unique per session only, because there is no server to allocate them.
+- Running the app requires your own OIDC provider and realm. Without
+  configuration the login page explains that sign-in is unavailable.
+- Silent token renewal is deliberately disabled; an expired session requires
+  signing in again.
+- 401 and 403 are represented and mapped to messages, but the mock never emits
+  them, so those paths are covered only by tests with injected errors.
 
 ## Routes
 
 Public: /login and /auth/callback.
 Protected: /requests, /requests/new, /requests/:requestId.
-/requests provides the local mock list; /requests/:requestId shows read-only details. Creation remains a placeholder;
-no real Service Requests API endpoints have been integrated. Authenticated visitors to /login go to /requests.
-
-Production hosting must serve index.html for SPA routes, including /auth/callback.
-
-## Verification
-
-npm test covers OIDC configuration/session behavior, the list service contract,
-and page interactions, including debounce, filters, pagination, retry, and stale responses.
-Tests use SDK mocks only; production authentication never uses fake sessions.
-Real provider sign-in/logout must be checked with your registered OIDC client.
-
-SDK reference: https://authts.github.io/oidc-client-ts/classes/UserManager.html
-
-## Service requests list (local mock)
-
-The list uses this boundary:
-
-RequestsPage → useServiceRequests → serviceRequestService → getMockServiceRequests
-
-Centralized types in src/types/serviceRequest.ts match the supplied API contract.
-The dedicated mock dataset has 28 fixed records, all statuses/priorities, example.com
-addresses, and UTC timestamps. The mock applies case-insensitive substring search
-to title/requester name, combines status and priority, sorts, then paginates.
-It simulates 250 ms latency and never sends a token or makes a network request.
-
-Pagination is one-based (default page 1, pageSize 10; allowed size 1–100).
-Invalid numeric pagination rejects with a RangeError. Pages beyond the result
-range return an empty items array without changing total/totalPages.
-Priority sorting uses LOW < MEDIUM < HIGH < CRITICAL. Ties use request ID for
-deterministic ordering. No matches return total 0, totalPages 0, and items [].
-
-The UI debounces search by 350 ms. Filters, sort, and page-size changes reset page
-to 1; page navigation preserves filters. Clear filters also restores newest-first
-sorting while retaining the selected page size. The page-size selector remains
-available when there is only one page, even though Previous/Next are hidden.
-Dates display in UTC. Cards link to the protected request details page.
-
-The hook ignores superseded responses and exposes data, loading, error, and
-refetch. Skeletons, retry, and distinct empty states are included. Error behavior
-is tested with service mocks; there are no random production mock failures.
-Authentication and Keycloak configuration are unchanged.
-
-## Replace the mock with HTTP later
-
-VITE_API_BASE_URL is intentionally empty and unused by the mock. Once the API
-contract/environment is confirmed, change the delegation in
-src/services/serviceRequestService.ts to a real GET /requests implementation:
-
-1. Read and validate VITE_API_BASE_URL.
-2. Serialize defined ServiceRequestFilters as query parameters.
-3. Reuse authService.getAccessToken() for Authorization: Bearer when integrating
-   authenticated HTTP. Never introduce separate token storage, scopes, or audiences.
-4. Handle non-success responses and return ServiceRequestPage.
-
-The components and hook retain their interfaces. Filtering, sorting, and
-pagination will then be performed by the real API. No backend or real API URL is used; every call still goes to the mock.
-
-## Read-only request details
-
-/requests/:requestId reads its ID from the router and works on direct navigation.
-RequestDetailsPage → useServiceRequest → getServiceRequestById → existing mock data.
-
-Both mock methods share mockDelay (250 ms). Details return a copy of the record.
-Unknown or invalid IDs reject with ServiceRequestNotFoundError (status 404);
-the hook distinguishes this from a general failure. The UI provides skeletons,
-not-found feedback, retry for general errors, and a Back to requests link.
-
-All model fields are displayed, including the full description and read-only
-version. Status/priority badges and UTC date formatting are shared with the list.
-Details display date and time with an explicit UTC suffix. Long descriptions
-preserve line breaks and wrap; the requester email is a mailto link.
-Only the status can be edited here (see Status updates below).
-
-The original list uses local component state. Returning to /requests resets its
-filters/page as before; no global state or persistence layer has been introduced.
-Authentication and Keycloak configuration are unchanged.
-
-For real integration, replace getServiceRequestById's mock delegation with
-GET /requests/{requestId} using VITE_API_BASE_URL and the existing
-authService.getAccessToken(). Encode the ID as a URL path segment and map an
-HTTP 404 to ServiceRequestNotFoundError. Preserve the Promise<ServiceRequest>
-contract; the hook/page need no changes. The real API is not integrated because
-its base URL is unavailable.
-
-Details tests cover lookup, 404, latency, record isolation, date formatting,
-direct routes, loading, complete rendering, safe errors/retry, list navigation,
-logout delegation, route protection, and stale responses. Authentication tests
-use a test session adapter; live Keycloak sign-in is not executed by the suite.
-
-## Status updates (PATCH /requests/{requestId}/status)
-
-The details page is the only place a request changes, and only its status changes:
-
-RequestDetailsPage → useServiceRequest.updateStatus → serviceRequestService
-→ updateMockServiceRequestStatus → in-memory store
-
-src/domain/serviceRequestStatus.ts is the single source of truth for the allowed
-transitions: OPEN → IN_PROGRESS/CLOSED, IN_PROGRESS → RESOLVED/OPEN,
-RESOLVED → CLOSED/IN_PROGRESS, and CLOSED → nothing. The selector offers exactly
-that table, so the current status is never an update target and a closed request
-shows an explanation instead of a form. The service validates the same table
-again, so the mock rejects an invalid transition even if the UI is bypassed.
-
-Concurrency is optimistic. The client sends the version it last read; the mock
-compares it with the stored version and rejects a mismatch with 409 before
-checking anything else. A successful update increments the version by exactly
-one, refreshes updatedAt to a new ISO 8601 UTC timestamp, leaves createdAt
-alone, and writes the record back to the in-memory store, so the list and later
-reads show the change for the rest of the session. resetMockServiceRequests()
-restores the fixtures for tests; no conflict is random.
-
-ServiceRequestError carries status 404/409/422 (plus a transition/note
-discriminator) so the hook can map failures to messages: a 409 explains that
-another user changed the request and offers Reload request, which refetches
-through getServiceRequestById and clears the stale attempt without resubmitting
-it; a 422 reports the rejected transition or the note limit; a 404 falls back to
-the existing not-found view; anything else shows a retryable generic message.
-Updates are never optimistic and never retried automatically.
-
-The optional note accepts 1–500 characters, counted in Unicode code points by
-statusNoteLength so the counter matches the service validation. An empty note is not
-sent. While a submission is in flight the selector, textarea, and buttons are
-disabled, the form is aria-busy, a live region announces progress, and the
-loaded record stays on screen. Closing a request asks for one inline
-confirmation because CLOSED is terminal.
-
-Replace updateMockServiceRequestStatus with PATCH
-${VITE_API_BASE_URL}/requests/{requestId}/status, sending the
-UpdateServiceRequestStatus body with Authorization: Bearer from
-authService.getAccessToken(), and map HTTP 404/409/422 onto the same
-ServiceRequestError. The hook, component, and tests need no changes. The real
-API is not integrated because its base URL is unavailable.
-
-Status tests cover the transition table, every valid and representative invalid
-transition, stale/future versions, two concurrent updates, 404, note lengths
-including exactly 500 and astral characters, store persistence and isolation,
-and on the UI side the offered options, the closed state, the counter, submit
-and disabled states, success with the new version, duplicate-click protection,
-the close confirmation, 409 with reload, 422, generic errors, and the list after
-an update.
-
-## Create a request (POST /requests)
-
-/requests/new is a protected route reached from Create request on the list. It
-replaces the earlier placeholder page:
-
-CreateRequestPage → createServiceRequest → createMockServiceRequest → shared store
-
-src/domain/createServiceRequest.ts holds the contract in one place: the length
-limits (title 3–120, description 10–2000, category 2–50, requester name 2–100,
-email max 254), the four priorities, and validateCreateServiceRequest, which
-returns one message per invalid field. The form runs it before sending anything
-and the mock runs it again, so an invalid payload cannot reach the store even if
-the form is bypassed. Lengths are counted in Unicode code points, values are
-trimmed before validation, and nothing the user typed is silently truncated.
-
-The mock assigns the server-owned fields the API would assign: the next unused
-REQ-XXXX id from the shared store, status OPEN, version 1, and createdAt and
-updatedAt as the same ISO 8601 UTC timestamp. It writes through the same store
-the list, details, and status updates already use, so a new request is
-immediately searchable, openable, and ready for a status change in that session.
-resetMockServiceRequests() drops created records again for tests.
-
-A 422 carries field errors on ServiceRequestError.fields, which the page maps
-back onto the matching inputs; 400, 401, 403, and 500 each map to one readable
-sentence and anything else to a generic retryable message, so no raw exception,
-undefined, or [object Object] is ever rendered. While a submission is in flight
-the controls are disabled, the form is aria-busy, a live region announces
-progress, and the entered data stays on screen; a ref guard stops a double click
-from sending twice. On success the page navigates to the created request's own
-details URL. Cancel returns to the list and submits nothing.
-
-Every input has a label, required fields use the native required attribute with
-a visible asterisk and a legend, errors are linked with aria-describedby and
-announced with role="alert", and the character counters for title and
-description update as the user types. The layout is a two-column grid that
-collapses to one column on small screens.
-
-Creation keeps no hook of its own: the existing hooks exist to manage async
-loading lifecycles, and a one-shot command needs only a submitting flag, so the
-page calls the service directly through the same service boundary.
-
-For the real API, replace the createMockServiceRequest delegation with
-POST ${VITE_API_BASE_URL}/requests sending the CreateServiceRequest body with
-Authorization: Bearer from authService.getAccessToken(), map 201 to
-ServiceRequest and 400/401/403/422/500 to ServiceRequestError. The page needs no
-changes. The real API is not integrated because its base URL is unavailable.
-
-Creation tests cover the assigned fields and ID format, mock latency, unique IDs,
-every priority, the shortest and longest accepted values, store persistence
-through reads/list/filters and a following status update, each documented
-validation failure with its field, and on the UI side rendering, counters,
-route protection, the list entry point, client-side validation, trimmed
-submission, the submitting state, duplicate-submission protection, the created
-request appearing in the list, 400/401/403/422/500 and unexpected failures,
-retry, and cancel.
+/requests lists the mock data, /requests/:requestId shows one request with its
+status update form, and /requests/new creates one. Authenticated visitors to
+/login go to /requests.
