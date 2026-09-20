@@ -73,9 +73,6 @@ button:focus-visible { outline: 3px solid #263e65; outline-offset: 5px; }
 .auth-error { font-size: 12px; line-height: 1.6; padding: 12px 14px; border: 1px solid #f1d4c5; border-radius: 8px; color: #92390c; background: #fff7f1; }
 .spinner { width: 16px; height: 16px; border: 2px solid #ffffff65; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; }
 .session-loading { min-height: 100svh; display: grid; place-items: center; }
-.requests-page { max-width: 1100px; margin: 0 auto; padding: 32px; }
-.requests-page header { display: flex; justify-content: space-between; align-items: center; gap: 20px; margin-bottom: 60px; }
-.requests-page header button { width: auto; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (max-width: 1000px) { .login-layout { padding: 32px 24px 22px; } .login-shell { padding: 18px; } .intro-panel { padding: 30px 24px 22px; min-height: 560px; } .intro-panel h1 { font-size: 36px; } .auth-panel { padding: 30px 24px 10px 36px; } .illustration-card { width: 270px; left: 0; } .resolved-badge { right: -12px; } .auth-content h2 { font-size: 33px; } .orbit-one { left: -10px; } .orbit-two { left: 25px; } }
 @media (max-width: 760px) { .login-layout { padding: 24px 16px; } .login-shell { display: block; max-width: 460px; padding: 0; border-radius: 24px; } .intro-panel { display: none; } .auth-panel { padding: 38px 30px 25px; min-height: 540px; } .auth-content { margin-top: 44px; } .auth-content h2 { font-size: 36px; } .auth-footer { padding-top: 40px; } .page-footer { font-size: 10px; } }

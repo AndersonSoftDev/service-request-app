@@ -4,6 +4,7 @@ import { ProtectedRoute } from './auth/ProtectedRoute'
 import { LoginPage } from './pages/LoginPage'
 import { AuthCallbackPage } from './pages/AuthCallbackPage'
 import { RequestsPage } from './pages/RequestsPage'
+import { RequestPlaceholderPage } from './pages/RequestPlaceholderPage'
 
 function App() {
   return <BrowserRouter><AuthProvider><Routes>
@@ -11,8 +12,8 @@ function App() {
     <Route path="/auth/callback" element={<AuthCallbackPage />} />
     <Route element={<ProtectedRoute />}>
       <Route path="/requests" element={<RequestsPage />} />
-      <Route path="/requests/new" element={<RequestsPage />} />
-      <Route path="/requests/:requestId" element={<RequestsPage />} />
+      <Route path="/requests/new" element={<RequestPlaceholderPage />} />
+      <Route path="/requests/:requestId" element={<RequestPlaceholderPage />} />
     </Route>
     <Route path="*" element={<Navigate to="/requests" replace />} />
   </Routes></AuthProvider></BrowserRouter>

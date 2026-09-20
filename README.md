@@ -62,16 +62,61 @@ provider details and tokens are never rendered.
 
 Public: /login and /auth/callback.
 Protected: /requests, /requests/new, /requests/:requestId.
-The request routes intentionally share a placeholder; no Service Requests API
-or endpoints have been implemented. Authenticated visitors to /login go to /requests.
+/requests provides the local mock list. Creation and detail routes remain placeholders;
+no real Service Requests API endpoints have been integrated. Authenticated visitors to /login go to /requests.
 
 Production hosting must serve index.html for SPA routes, including /auth/callback.
 
 ## Verification
 
-npm test covers configuration, missing configuration, expired sessions, token
-access, SDK delegation, callback deduplication/failure, and session event cleanup.
+npm test covers OIDC configuration/session behavior, the list service contract,
+and page interactions, including debounce, filters, pagination, retry, and stale responses.
 Tests use SDK mocks only; production authentication never uses fake sessions.
 Real provider sign-in/logout must be checked with your registered OIDC client.
 
 SDK reference: https://authts.github.io/oidc-client-ts/classes/UserManager.html
+
+## Service requests list (local mock)
+
+The list uses this boundary:
+
+RequestsPage → useServiceRequests → serviceRequestService → getMockServiceRequests
+
+Centralized types in src/types/serviceRequest.ts match the supplied API contract.
+The dedicated mock dataset has 28 fixed records, all statuses/priorities, example.com
+addresses, and UTC timestamps. The mock applies case-insensitive substring search
+to title/requester name, combines status and priority, sorts, then paginates.
+It simulates 250 ms latency and never sends a token or makes a network request.
+
+Pagination is one-based (default page 1, pageSize 10; allowed size 1–100).
+Invalid numeric pagination rejects with a RangeError. Pages beyond the result
+range return an empty items array without changing total/totalPages.
+Priority sorting uses LOW < MEDIUM < HIGH < CRITICAL. Ties use request ID for
+deterministic ordering. No matches return total 0, totalPages 0, and items [].
+
+The UI debounces search by 350 ms. Filters, sort, and page-size changes reset page
+to 1; page navigation preserves filters. Clear filters also restores newest-first
+sorting while retaining the selected page size. The page-size selector remains
+available when there is only one page, even though Previous/Next are hidden.
+Dates display in UTC. Cards link to the existing protected detail placeholder.
+
+The hook ignores superseded responses and exposes data, loading, error, and
+refetch. Skeletons, retry, and distinct empty states are included. Error behavior
+is tested with service mocks; there are no random production mock failures.
+Authentication and Keycloak configuration are unchanged.
+
+## Replace the mock with HTTP later
+
+VITE_API_BASE_URL is intentionally empty and unused by the mock. Once the API
+contract/environment is confirmed, change the delegation in
+src/services/serviceRequestService.ts to a real GET /requests implementation:
+
+1. Read and validate VITE_API_BASE_URL.
+2. Serialize defined ServiceRequestFilters as query parameters.
+3. Reuse authService.getAccessToken() for Authorization: Bearer when integrating
+   authenticated HTTP. Never introduce separate token storage, scopes, or audiences.
+4. Handle non-success responses and return ServiceRequestPage.
+
+The components and hook retain their interfaces. Filtering, sorting, and
+pagination will then be performed by the real API. No backend, API URL, creation,
+status-update, or request-detail implementation is included in this task.
