@@ -1,12 +1,30 @@
-﻿export function RequestDetailsSkeleton() {
+export function RequestDetailsSkeleton() {
   return <div className="request-detail detail-skeleton" role="status" aria-label="Loading request details">
     <span className="sr-only">Loading request details…</span>
+    {/* Mirrors the details layout so the page does not shift when data arrives. */}
     <div aria-hidden="true">
-      <div className="detail-header"><div className="detail-skeleton-title"><span className="skeleton-line skeleton-short" /><span className="skeleton-line skeleton-title" /></div><span className="skeleton-pill" /></div>
+      <div className="detail-header">
+        <span className="skeleton-line skeleton-short" />
+        <span className="skeleton-line skeleton-title" />
+        <div className="detail-badges"><span className="skeleton-pill" /><span className="skeleton-pill" /></div>
+      </div>
+      <div className="detail-meta">
+        {[1, 2, 3].map((item) => <div key={item}>
+          <span className="skeleton-line skeleton-label" /><span className="skeleton-line skeleton-value" />
+        </div>)}
+      </div>
       <div className="detail-columns">
-        <div className="detail-description"><span className="skeleton-line skeleton-short" />
-          <span className="skeleton-line skeleton-title" /><span className="skeleton-line skeleton-person" /><span className="skeleton-line skeleton-title" /></div>
-        <div className="detail-sidebar">{[1, 2, 3].map((item) => <div key={item}><span className="skeleton-line skeleton-short" /><span className="skeleton-line skeleton-title" /></div>)}</div>
+        <div className="detail-description">
+          <span className="skeleton-line skeleton-label" />
+          <span className="skeleton-line skeleton-body" />
+          <span className="skeleton-line skeleton-body" />
+          <span className="skeleton-line skeleton-body skeleton-body-end" />
+        </div>
+        <div className="detail-sidebar">
+          <span className="skeleton-line skeleton-label" />
+          <span className="skeleton-line skeleton-value" />
+          <span className="skeleton-line skeleton-value" />
+        </div>
       </div>
     </div>
   </div>

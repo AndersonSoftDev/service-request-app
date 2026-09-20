@@ -2,6 +2,7 @@ import { useId, useState } from 'react'
 import { MAX_STATUS_NOTE_LENGTH, statusNoteLength, statusTransitions } from '../domain/serviceRequestStatus'
 import type { StatusUpdateError } from '../hooks/useServiceRequest'
 import type { ServiceRequest, ServiceRequestStatus } from '../types/serviceRequest'
+import { StatusBadge } from './RequestBadges'
 import { statusLabels } from './requestLabels'
 
 // One message per failure the service can report; raw exceptions never reach the user.
@@ -57,15 +58,15 @@ export function RequestStatusUpdate({ request, submitting, error, success, onSub
 
   return <section className="status-update" aria-labelledby={`${id}-heading`}>
     <h2 id={`${id}-heading`}>Update status</h2>
+    <p className="status-update-current">
+      <span>Current status</span>
+      <StatusBadge status={request.status} />
+    </p>
     {options.length === 0
       ? <p className="status-update-locked">
-          <span aria-hidden="true">🔒</span>
-          <span>This request is {statusLabels[request.status].toLowerCase()} and can no longer change status.</span>
+          This request is {statusLabels[request.status].toLowerCase()} and can no longer change status.
         </p>
       : <form onSubmit={handleSubmit} aria-busy={submitting} noValidate>
-          <p className="status-update-intro">
-            Only the status can be changed. Every other field is read-only.
-          </p>
           <div className="status-update-fields">
             <div>
               <label htmlFor={`${id}-status`}>New status</label>

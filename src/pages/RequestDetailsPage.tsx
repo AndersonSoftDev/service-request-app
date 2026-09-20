@@ -13,16 +13,13 @@ export function RequestDetailsPage() {
 
   return <RequestsLayout>
     <Link className="detail-back" to="/requests"><span aria-hidden="true">←</span> Back to requests</Link>
-    <div className="requests-heading"><span className="workspace-eyebrow">YOUR WORKSPACE</span>
-      <h1>Service Request</h1>
-    </div>
     {loading ? <RequestDetailsSkeleton /> : error === 'not-found' ? <section className="request-state" aria-labelledby="not-found-heading">
-      <h2 id="not-found-heading">Request not found</h2>
-      <p role="status">The service request you’re looking for could not be found.</p>
+      <h1 id="not-found-heading">Request not found</h1>
+      <p role="status">The request you are looking for does not exist or is no longer available.</p>
       <Link className="secondary-button" to="/requests">Back to requests</Link>
     </section> : error ? <section className="request-state" aria-labelledby="error-heading">
-      <h2 id="error-heading">Unable to load request</h2>
-      <p role="alert">We could not load this request. Please try again.</p>
+      <h1 id="error-heading">Unable to load request</h1>
+      <p role="alert">Something went wrong while loading this request.</p>
       <button className="secondary-button" onClick={refetch}>Retry</button>
     </section> : data && <>
       <RequestDetails request={data} />

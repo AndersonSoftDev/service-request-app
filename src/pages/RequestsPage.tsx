@@ -36,8 +36,8 @@ export function RequestsPage() {
   const lastItem = data ? Math.min(data.page * data.pageSize, data.total) : 0
 
   return <RequestsLayout>
-    <div className="requests-heading requests-heading-row"><div><span className="workspace-eyebrow">YOUR WORKSPACE</span>
-      <h1>Service requests</h1><p>Find, track and stay on top of customer requests.</p></div>
+    <div className="requests-heading requests-heading-row">
+      <div><h1>Service Requests</h1><p>Manage and track customer service requests.</p></div>
       <Link className="primary-button" to="/requests/new">Create request</Link>
     </div>
     <RequestFilters filters={filters} search={search} onSearchChange={setSearch}
@@ -46,11 +46,6 @@ export function RequestsPage() {
       <div className="results-toolbar">
         <p role="status" aria-live="polite">{loading ? 'Finding requests…' : error ? 'Requests unavailable' : data?.total === 0
           ? '0 requests' : 'Showing ' + firstItem + '–' + lastItem + ' of ' + data?.total + ' requests'}</p>
-        <div className="page-size-control"><label htmlFor="request-page-size">Per page</label>
-          <select id="request-page-size" value={filters.pageSize} onChange={(event) => changeFilters({ pageSize: Number(event.target.value) })}>
-            {[5, 10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
-          </select>
-        </div>
       </div>
       {loading ? <RequestListSkeleton /> : error ? <div className="request-state">
         <h2>Unable to load requests</h2><p role="alert">{error}</p><button className="secondary-button" onClick={refetch}>Try again</button>
