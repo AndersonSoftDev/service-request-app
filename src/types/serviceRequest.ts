@@ -31,3 +31,9 @@ export interface ServiceRequestFilters {
   page?: number;
   pageSize?: number;
 }
+
+export interface UpdateServiceRequestStatus {
+  status: ServiceRequestStatus;
+  version: number;
+  note?: string;
+}

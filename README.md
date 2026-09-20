@@ -62,7 +62,7 @@ provider details and tokens are never rendered.
 
 Public: /login and /auth/callback.
 Protected: /requests, /requests/new, /requests/:requestId.
-/requests provides the local mock list. Creation and detail routes remain placeholders;
+/requests provides the local mock list; /requests/:requestId shows read-only details. Creation remains a placeholder;
 no real Service Requests API endpoints have been integrated. Authenticated visitors to /login go to /requests.
 
 Production hosting must serve index.html for SPA routes, including /auth/callback.
@@ -98,7 +98,7 @@ The UI debounces search by 350 ms. Filters, sort, and page-size changes reset pa
 to 1; page navigation preserves filters. Clear filters also restores newest-first
 sorting while retaining the selected page size. The page-size selector remains
 available when there is only one page, even though Previous/Next are hidden.
-Dates display in UTC. Cards link to the existing protected detail placeholder.
+Dates display in UTC. Cards link to the protected request details page.
 
 The hook ignores superseded responses and exposes data, loading, error, and
 refetch. Skeletons, retry, and distinct empty states are included. Error behavior
@@ -118,5 +118,88 @@ src/services/serviceRequestService.ts to a real GET /requests implementation:
 4. Handle non-success responses and return ServiceRequestPage.
 
 The components and hook retain their interfaces. Filtering, sorting, and
-pagination will then be performed by the real API. No backend, API URL, creation,
-status-update, or request-detail implementation is included in this task.
+pagination will then be performed by the real API. No backend, real API URL, or request-creation implementation is included.
+
+## Read-only request details
+
+/requests/:requestId reads its ID from the router and works on direct navigation.
+RequestDetailsPage → useServiceRequest → getServiceRequestById → existing mock data.
+
+Both mock methods share mockDelay (250 ms). Details return a copy of the record.
+Unknown or invalid IDs reject with ServiceRequestNotFoundError (status 404);
+the hook distinguishes this from a general failure. The UI provides skeletons,
+not-found feedback, retry for general errors, and a Back to requests link.
+
+All model fields are displayed, including the full description and read-only
+version. Status/priority badges and UTC date formatting are shared with the list.
+Details display date and time with an explicit UTC suffix. Long descriptions
+preserve line breaks and wrap; the requester email is a mailto link.
+Only the status can be edited (see Status updates below); no creation has been added.
+
+The original list uses local component state. Returning to /requests resets its
+filters/page as before; no global state or persistence layer has been introduced.
+Authentication, Keycloak configuration, and the create placeholder are unchanged.
+
+For real integration, replace getServiceRequestById's mock delegation with
+GET /requests/{requestId} using VITE_API_BASE_URL and the existing
+authService.getAccessToken(). Encode the ID as a URL path segment and map an
+HTTP 404 to ServiceRequestNotFoundError. Preserve the Promise<ServiceRequest>
+contract; the hook/page need no changes. The real API is not integrated because
+its base URL is unavailable.
+
+Details tests cover lookup, 404, latency, record isolation, date formatting,
+direct routes, loading, complete rendering, safe errors/retry, list navigation,
+logout delegation, route protection, and stale responses. Authentication tests
+use a test session adapter; live Keycloak sign-in is not executed by the suite.
+
+## Status updates (PATCH /requests/{requestId}/status)
+
+The details page is the only place a request changes, and only its status changes:
+
+RequestDetailsPage → useServiceRequest.updateStatus → serviceRequestService
+→ updateMockServiceRequestStatus → in-memory store
+
+src/domain/serviceRequestStatus.ts is the single source of truth for the allowed
+transitions: OPEN → IN_PROGRESS/CLOSED, IN_PROGRESS → RESOLVED/OPEN,
+RESOLVED → CLOSED/IN_PROGRESS, and CLOSED → nothing. The selector offers exactly
+that table, so the current status is never an update target and a closed request
+shows an explanation instead of a form. The service validates the same table
+again, so the mock rejects an invalid transition even if the UI is bypassed.
+
+Concurrency is optimistic. The client sends the version it last read; the mock
+compares it with the stored version and rejects a mismatch with 409 before
+checking anything else. A successful update increments the version by exactly
+one, refreshes updatedAt to a new ISO 8601 UTC timestamp, leaves createdAt
+alone, and writes the record back to the in-memory store, so the list and later
+reads show the change for the rest of the session. resetMockServiceRequests()
+restores the fixtures for tests; no conflict is random.
+
+ServiceRequestError carries status 404/409/422 (plus a transition/note
+discriminator) so the hook can map failures to messages: a 409 explains that
+another user changed the request and offers Reload request, which refetches
+through getServiceRequestById and clears the stale attempt without resubmitting
+it; a 422 reports the rejected transition or the note limit; a 404 falls back to
+the existing not-found view; anything else shows a retryable generic message.
+Updates are never optimistic and never retried automatically.
+
+The optional note accepts 1–500 characters, counted in Unicode code points by
+statusNoteLength so the counter matches the service validation. An empty note is not
+sent. While a submission is in flight the selector, textarea, and buttons are
+disabled, the form is aria-busy, a live region announces progress, and the
+loaded record stays on screen. Closing a request asks for one inline
+confirmation because CLOSED is terminal.
+
+Replace updateMockServiceRequestStatus with PATCH
+${VITE_API_BASE_URL}/requests/{requestId}/status, sending the
+UpdateServiceRequestStatus body with Authorization: Bearer from
+authService.getAccessToken(), and map HTTP 404/409/422 onto the same
+ServiceRequestError. The hook, component, and tests need no changes. The real
+API is not integrated because its base URL is unavailable.
+
+Status tests cover the transition table, every valid and representative invalid
+transition, stale/future versions, two concurrent updates, 404, note lengths
+including exactly 500 and astral characters, store persistence and isolation,
+and on the UI side the offered options, the closed state, the counter, submit
+and disabled states, success with the new version, duplicate-click protection,
+the close confirmation, 409 with reload, 422, generic errors, and the list after
+an update.
