@@ -1,4 +1,5 @@
-﻿import type { ServiceRequestStatus } from '../types/serviceRequest'
+import type { ServiceRequestStatus } from '../types/serviceRequest'
+import { textLength } from './textLength'
 
 export const statusTransitions: Readonly<Record<ServiceRequestStatus, readonly ServiceRequestStatus[]>> = {
   OPEN: ['IN_PROGRESS', 'CLOSED'],
@@ -9,7 +10,6 @@ export const statusTransitions: Readonly<Record<ServiceRequestStatus, readonly S
 
 export const MAX_STATUS_NOTE_LENGTH = 500
 
-// OpenAPI string lengths count Unicode code points, not UTF-16 code units.
 export function statusNoteLength(note: string): number {
-  return Array.from(note).length
+  return textLength(note)
 }

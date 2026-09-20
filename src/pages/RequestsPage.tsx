@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { RequestsLayout } from '../components/RequestsLayout'
 import { RequestFilters } from '../components/RequestFilters'
 import { RequestCard } from '../components/RequestCard'
@@ -35,8 +36,9 @@ export function RequestsPage() {
   const lastItem = data ? Math.min(data.page * data.pageSize, data.total) : 0
 
   return <RequestsLayout>
-    <div className="requests-heading"><span className="workspace-eyebrow">YOUR WORKSPACE</span>
-      <h1>Service requests</h1><p>Find, track and stay on top of customer requests.</p>
+    <div className="requests-heading requests-heading-row"><div><span className="workspace-eyebrow">YOUR WORKSPACE</span>
+      <h1>Service requests</h1><p>Find, track and stay on top of customer requests.</p></div>
+      <Link className="primary-button" to="/requests/new">Create request</Link>
     </div>
     <RequestFilters filters={filters} search={search} onSearchChange={setSearch}
       onChange={changeFilters} onClear={clearFilters} canClear={canClear} />

@@ -118,7 +118,7 @@ src/services/serviceRequestService.ts to a real GET /requests implementation:
 4. Handle non-success responses and return ServiceRequestPage.
 
 The components and hook retain their interfaces. Filtering, sorting, and
-pagination will then be performed by the real API. No backend, real API URL, or request-creation implementation is included.
+pagination will then be performed by the real API. No backend or real API URL is used; every call still goes to the mock.
 
 ## Read-only request details
 
@@ -134,11 +134,11 @@ All model fields are displayed, including the full description and read-only
 version. Status/priority badges and UTC date formatting are shared with the list.
 Details display date and time with an explicit UTC suffix. Long descriptions
 preserve line breaks and wrap; the requester email is a mailto link.
-Only the status can be edited (see Status updates below); no creation has been added.
+Only the status can be edited here (see Status updates below).
 
 The original list uses local component state. Returning to /requests resets its
 filters/page as before; no global state or persistence layer has been introduced.
-Authentication, Keycloak configuration, and the create placeholder are unchanged.
+Authentication and Keycloak configuration are unchanged.
 
 For real integration, replace getServiceRequestById's mock delegation with
 GET /requests/{requestId} using VITE_API_BASE_URL and the existing
@@ -203,3 +203,59 @@ and on the UI side the offered options, the closed state, the counter, submit
 and disabled states, success with the new version, duplicate-click protection,
 the close confirmation, 409 with reload, 422, generic errors, and the list after
 an update.
+
+## Create a request (POST /requests)
+
+/requests/new is a protected route reached from Create request on the list. It
+replaces the earlier placeholder page:
+
+CreateRequestPage → createServiceRequest → createMockServiceRequest → shared store
+
+src/domain/createServiceRequest.ts holds the contract in one place: the length
+limits (title 3–120, description 10–2000, category 2–50, requester name 2–100,
+email max 254), the four priorities, and validateCreateServiceRequest, which
+returns one message per invalid field. The form runs it before sending anything
+and the mock runs it again, so an invalid payload cannot reach the store even if
+the form is bypassed. Lengths are counted in Unicode code points, values are
+trimmed before validation, and nothing the user typed is silently truncated.
+
+The mock assigns the server-owned fields the API would assign: the next unused
+REQ-XXXX id from the shared store, status OPEN, version 1, and createdAt and
+updatedAt as the same ISO 8601 UTC timestamp. It writes through the same store
+the list, details, and status updates already use, so a new request is
+immediately searchable, openable, and ready for a status change in that session.
+resetMockServiceRequests() drops created records again for tests.
+
+A 422 carries field errors on ServiceRequestError.fields, which the page maps
+back onto the matching inputs; 400, 401, 403, and 500 each map to one readable
+sentence and anything else to a generic retryable message, so no raw exception,
+undefined, or [object Object] is ever rendered. While a submission is in flight
+the controls are disabled, the form is aria-busy, a live region announces
+progress, and the entered data stays on screen; a ref guard stops a double click
+from sending twice. On success the page navigates to the created request's own
+details URL. Cancel returns to the list and submits nothing.
+
+Every input has a label, required fields use the native required attribute with
+a visible asterisk and a legend, errors are linked with aria-describedby and
+announced with role="alert", and the character counters for title and
+description update as the user types. The layout is a two-column grid that
+collapses to one column on small screens.
+
+Creation keeps no hook of its own: the existing hooks exist to manage async
+loading lifecycles, and a one-shot command needs only a submitting flag, so the
+page calls the service directly through the same service boundary.
+
+For the real API, replace the createMockServiceRequest delegation with
+POST ${VITE_API_BASE_URL}/requests sending the CreateServiceRequest body with
+Authorization: Bearer from authService.getAccessToken(), map 201 to
+ServiceRequest and 400/401/403/422/500 to ServiceRequestError. The page needs no
+changes. The real API is not integrated because its base URL is unavailable.
+
+Creation tests cover the assigned fields and ID format, mock latency, unique IDs,
+every priority, the shortest and longest accepted values, store persistence
+through reads/list/filters and a following status update, each documented
+validation failure with its field, and on the UI side rendering, counters,
+route protection, the list entry point, client-side validation, trimmed
+submission, the submitting state, duplicate-submission protection, the created
+request appearing in the list, 400/401/403/422/500 and unexpected failures,
+retry, and cancel.

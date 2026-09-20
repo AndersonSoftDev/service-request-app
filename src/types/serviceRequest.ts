@@ -37,3 +37,13 @@ export interface UpdateServiceRequestStatus {
   version: number;
   note?: string;
 }
+
+// Server-assigned fields (id, status, createdAt, updatedAt, version) are deliberately absent.
+export interface CreateServiceRequest {
+  title: string;
+  description: string;
+  category: string;
+  priority: ServiceRequestPriority;
+  requesterName: string;
+  requesterEmail: string;
+}

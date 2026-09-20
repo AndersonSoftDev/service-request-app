@@ -109,3 +109,11 @@
   .workspace-brand { font-size: 11px; gap: 8px; }
   .workspace-brand .portal-mark { width: 32px; height: 32px; }
 }
+
+.detail-back { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin: -8px 0 16px; color: #765039; font-size: 13px; text-decoration: none; }
+.detail-back:hover { text-decoration: underline; text-underline-offset: 4px; }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 44px; padding: 10px 20px; border: 1px solid transparent; border-radius: 8px; background: #b9470a; color: #fff; font-size: 13px !important; font-weight: 600 !important; text-decoration: none; cursor: pointer; }
+.primary-button:hover:not(:disabled) { background: #9d3b06; }
+.requests-heading-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+.requests-heading-row > div { min-width: 0; }
+@media (max-width: 600px) { .requests-heading-row > .primary-button { width: 100%; } }

@@ -113,9 +113,10 @@ describe('request details and protected navigation', () => {
     await act(async () => resolveSession(null))
     expect(window.location.pathname).toBe('/login')
   })
-  it('keeps the creation route as a placeholder', async () => {
+  it('serves the create page on the creation route', async () => {
     await renderApp('/requests/new')
-    expect(container.textContent).toContain('This page is not available yet.')
+    expect(container.textContent).toContain('Create Service Request')
+    expect(container.querySelector('.create-form')).not.toBeNull()
     expect(container.querySelector('.request-detail')).toBeNull()
   })
   it('renders the complete multiline description and long requester information', async () => {

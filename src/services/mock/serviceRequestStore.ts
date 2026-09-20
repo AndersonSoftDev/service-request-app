@@ -20,3 +20,12 @@ export function readMockRequest(id: string): ServiceRequest | undefined {
 export function writeMockRequest(request: ServiceRequest): void {
   requests.set(request.id, { ...request })
 }
+
+// Creation reuses this store, so generated IDs stay unique for the whole session.
+export function nextMockRequestId(): string {
+  const highest = [...requests.keys()].reduce((max, id) => {
+    const value = Number(id.slice('REQ-'.length))
+    return Number.isSafeInteger(value) && value > max ? value : max
+  }, 1000)
+  return 'REQ-' + (highest + 1)
+}
